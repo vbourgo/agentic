@@ -26,7 +26,7 @@ GATE = f'''
 <span style="font-size: 17px; font-weight: 600; color: #F5F5F7">{{{{gateTitle}}}}</span>
 <span style="font-size: 15px; color: #A1A1A6">Laissez votre e-mail pour afficher le rapport détaillé : chaque point, son impact sur votre score et le nombre de fiches concernées.</span>
 </div>
-<form sc-camel-on-submit="{{{{onGateSubmit}}}}" style="width: 100%; max-width: 560px; display: flex; flex-wrap: wrap; gap: 10px; padding: 6px; box-sizing: border-box; background: #1C1C1E; border: 1px solid #2C2C2E; border-radius: 999px">
+<form sc-camel-on-submit="{{{{onGateSubmit}}}}" style="width: 100%; max-width: 560px; display: flex; flex-wrap: wrap; gap: 10px; padding: 6px; box-sizing: border-box; background: #1C1C1E; border: 1px solid #2C2C2E; border-radius: 30px">
 <label for="gate-email" style="{SR_ONLY}">Votre e-mail professionnel</label>
 <input id="gate-email" type="email" autocomplete="email" placeholder="vous@marque.com" value="{{{{gateEmail}}}}" sc-camel-on-change="{{{{onGateEmail}}}}" style="flex: 1 1 200px; min-width: 0; min-height: 52px; box-sizing: border-box; padding: 0 20px; font-size: 17px; font-family: Inter, sans-serif; color: #F5F5F7; background: transparent; border: none; border-radius: 999px; outline: none">
 <button type="submit" disabled="{{{{gateBusy}}}}" style="flex: 0 0 auto; min-height: 52px; padding: 0 26px; font-size: 16px; font-weight: 600; font-family: Inter, sans-serif; color: #000000; background: #F5F5F7; border: none; border-radius: 999px; cursor: pointer">{{{{gateCta}}}}</button>
@@ -34,7 +34,7 @@ GATE = f'''
 <sc-if value="{{{{hasGateError}}}}" hint-placeholder-val="{{{{ false }}}}">
 <span role="alert" style="font-size: 14px; color: #FF453A">{{{{gateError}}}}</span>
 </sc-if>
-<span style="font-size: 13px; color: #8E8E93">Gratuit · Accès immédiat au rapport complet</span>
+<span style="font-size: 13px; line-height: 1.5; color: #8E8E93">Gratuit · Accès immédiat au rapport complet<br>En validant, vous acceptez d’être recontacté au sujet de votre audit.</span>
 </div>
 </sc-if>
 '''
