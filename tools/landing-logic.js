@@ -7,7 +7,16 @@ this.run = 0;
 this.state = { url: '', auditUrl: '', phase: 'idle', step: 0, report: null, error: '', email: '', subscribed: false, car: 0, wrapIdx: -1, gateEmail: savedEmail, gateBusy: false, gateError: '', sentTo: '' };
 }
 componentDidMount() {
-var self = this;
+// The page renders after the bundle unpacks, so the browser's own jump to
+// #methode, #offres… happens too early: redo it once the sections exist.
+try {
+var id = decodeURIComponent(String(window.location.hash || '').slice(1));
+if (id) {
+var go = function () { var el = document.getElementById(id); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start', behavior: 'instant' }); };
+setTimeout(go, 120);
+setTimeout(go, 900);
+}
+} catch (err) {}
 }
 componentWillUnmount() {
 if (this.timer) clearInterval(this.timer);

@@ -25,7 +25,7 @@ function mockRes() {
 test('report e-mail contains every sub-score and issue, escaped', () => {
   const { html, text, subject } = renderReportEmail(REPORT, { siteUrl: 'https://example.vercel.app' });
   assert.equal(subject, 'Votre rapport Agent-Ready : gemmyo.com — 64/100');
-  for (const s of ['Attributs produits', 'Données structurées', 'Aucun connecteur UCP ou MCP exposé', '+14 pts', '+5 pts', '64 &rarr;', 'https://example.vercel.app/#offres']) assert.ok(html.includes(s), s);
+  for (const s of ['Attributs produits', 'Données structurées', 'Aucun connecteur UCP ou MCP exposé', '+14 pts', '+5 pts', '64 &rarr;', 'https://example.vercel.app/#methode']) assert.ok(html.includes(s), s);
   assert.ok(html.includes('GTIN / EAN absents &lt;script&gt;'));
   assert.ok(!html.includes('<script>'));
   assert.ok(text.includes('[Important] GTIN / EAN absents <script> (+5 pts)'));

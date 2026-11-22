@@ -8,10 +8,16 @@ The export is a self-contained bundle: its markup lives in a JSON string inside
 - swaps the simulated audit for tools/landing-logic.js (real /api/audit call);
 - shows only the global score, the verdict and the most critical issue;
 - adds the e-mail form that sends the full report (/api/lead), its confirmation,
-  the consent notice and the error state.
+  the consent notice and the error state;
+- removes the "6 / Jan. 2026 / 0 clic" cards, adds a "Voir nos offres" button to
+  the method block, makes the logo link to the home page, enables smooth scrolling.
 
-Usage, after re-exporting the landing page:
-    python3 tools/patch_landing.py <exported-landing.html> public/index.html
+For the newsletter page it fixes the links (logo and menu back to the home page
+sections) and adds the mobile viewport.
+
+Usage, after re-exporting the pages from the design tool:
+    python3 tools/patch_landing.py landing <exported-landing.html> public/index.html
+    python3 tools/patch_landing.py newsletter <exported-newsletter.html> public/newsletter.html
 """
 import json
 import re
@@ -78,6 +84,17 @@ POTENTIAL_HIDDEN = ('<sc-if value="{{hideDetails}}" hint-placeholder-val="{{ tru
                     '</sc-if>\n')
 
 
+STATS_CARDS = re.compile(
+    r'<div style="display: grid; grid-template-columns: repeat\(auto-fit, minmax\(260px, 1fr\)\); gap: 20px">\n'
+    r'(?:(?!</section>).)*?Jan\. 2026.*?</div>\n</div>\n(?=</div>\n</section>)', re.S)
+
+METHOD_CTA = ('<div>\n<a href="#offres" style="display: inline-flex; align-items: center; min-height: 56px; padding: 0 30px; '
+              'font-size: 17px; font-weight: 600; text-decoration: none; color: #FFFFFF; background: #0F1218; border-radius: 999px">'
+              'Voir nos offres</a>\n</div>\n')
+
+SMOOTH_SCROLL = '<style>html { scroll-behavior: smooth; }</style>\n'
+
+
 def replace_once(text, old, new, label):
     count = text.count(old)
     if count != 1:
@@ -120,6 +137,30 @@ def patch_template(t):
     t = replace_once(t, 'Gratuit · Sans inscription · Shopify · Analyse UCP, ACP et MCP',
                      'Gratuit · Sans inscription · Tous sites e-commerce · Analyse UCP, ACP et MCP', 'hero note')
     t = replace_once(t, '>URL de votre boutique Shopify</label>', '>URL de votre boutique en ligne</label>', 'input label')
+
+    # "6 / Jan. 2026 / 0 clic" cards: removed (the heading above them stays).
+    t, n = STATS_CARDS.subn('', t)
+    if n != 1:
+        raise SystemExit(f'patch "stats cards": expected 1 block, found {n}')
+
+    # "Voir nos offres" at the end of the method block (target of the report e-mail).
+    start = t.find('<section id="methode"')
+    end = t.find('</section>', start)
+    if start < 0 or end < 0:
+        raise SystemExit('patch "method cta": section not found')
+    t = t[:end] + METHOD_CTA + t[end:]
+
+    t = replace_once(t, '<a href="#top" style="display: flex; align-items: center; gap: 10px;',
+                     '<a href="/" style="display: flex; align-items: center; gap: 10px;', 'logo')
+    t = replace_once(t, '<helmet>\n', '<helmet>\n' + SMOOTH_SCROLL, 'smooth scroll')
+    return t
+
+
+def patch_newsletter(t):
+    for label, anchor in (('Méthode', 'methode'), ('Offres', 'offres'), ('FAQ', 'faq')):
+        t, n = re.subn(r'<a href="/"([^>]*)>' + label + '</a>', r'<a href="/#' + anchor + r'"\1>' + label + '</a>', t)
+        if n != 1:
+            raise SystemExit(f'patch "newsletter {label}": expected 1 link, found {n}')
     return t
 
 
@@ -131,12 +172,12 @@ def prepare_bundle(html):
     return html
 
 
-def main(src, dst):
+def main(page, src, dst):
     html = prepare_bundle(Path(src).read_text())
     start = html.index(OPEN) + len(OPEN)
     end = html.index('</script>', start)
     raw = html[start:end]
-    patched = patch_template(json.loads(raw))
+    patched = (patch_template if page == 'landing' else patch_newsletter)(json.loads(raw))
     encoded = json.dumps(patched, ensure_ascii=False).replace('</', '<\\u002F')
     assert json.loads(encoded) == patched
     lead = raw[: len(raw) - len(raw.lstrip())]
@@ -146,6 +187,6 @@ def main(src, dst):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3:
+    if len(sys.argv) != 4 or sys.argv[1] not in ('landing', 'newsletter'):
         raise SystemExit(__doc__)
-    main(sys.argv[1], sys.argv[2])
+    main(sys.argv[1], sys.argv[2], sys.argv[3])

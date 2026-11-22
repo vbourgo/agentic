@@ -55,5 +55,6 @@ Environment variables (Vercel, Production):
 Extract the landing page from the design-tool export, then rebuild the production page from it:
 
 ```bash
-python3 tools/patch_landing.py exported-landing.html public/index.html
+python3 tools/patch_landing.py landing exported-landing.html public/index.html
+python3 tools/patch_landing.py newsletter exported-newsletter.html public/newsletter.html
 ```
