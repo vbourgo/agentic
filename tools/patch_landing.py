@@ -36,7 +36,7 @@ GATE = f'''
 <span style="font-size: 17px; font-weight: 600; color: #F5F5F7">{{{{gateTitle}}}}</span>
 <span style="font-size: 15px; color: #A1A1A6">{{{{gateText}}}}</span>
 </div>
-<form sc-camel-on-submit="{{{{onGateSubmit}}}}" style="width: 100%; max-width: 560px; display: flex; flex-wrap: wrap; gap: 10px; padding: 6px; box-sizing: border-box; background: #1C1C1E; border: 1px solid #2C2C2E; border-radius: 30px">
+<form class="arc-pill-form" sc-camel-on-submit="{{{{onGateSubmit}}}}" style="width: 100%; max-width: 560px; display: flex; flex-wrap: wrap; gap: 10px; padding: 6px; box-sizing: border-box; background: #1C1C1E; border: 1px solid #2C2C2E; border-radius: 30px">
 <label for="gate-email" style="{SR_ONLY}">Votre e-mail professionnel</label>
 <input id="gate-email" type="email" autocomplete="email" placeholder="vous@marque.com" value="{{{{gateEmail}}}}" sc-camel-on-change="{{{{onGateEmail}}}}" style="flex: 1 1 200px; min-width: 0; min-height: 52px; box-sizing: border-box; padding: 0 20px; font-size: 17px; font-family: Inter, sans-serif; color: #F5F5F7; background: transparent; border: none; border-radius: 999px; outline: none">
 <button type="submit" disabled="{{{{gateBusy}}}}" style="flex: 0 0 auto; min-height: 52px; padding: 0 26px; font-size: 16px; font-weight: 600; font-family: Inter, sans-serif; color: #000000; background: #F5F5F7; border: none; border-radius: 999px; cursor: pointer">{{{{gateCta}}}}</button>
@@ -92,7 +92,16 @@ METHOD_CTA = ('<div>\n<a href="#offres" style="display: inline-flex; align-items
               'font-size: 17px; font-weight: 600; text-decoration: none; color: #FFFFFF; background: #0F1218; border-radius: 999px">'
               'Voir nos offres</a>\n</div>\n')
 
-SMOOTH_SCROLL = '<style>html { scroll-behavior: smooth; }</style>\n'
+SMOOTH_SCROLL = ('<style>html { scroll-behavior: smooth; }'
+                 ' @media (max-width: 560px) { .arc-pill-form { border-radius: 30px !important; }'
+                 ' .arc-pill-form button { flex: 1 1 100% !important; } }</style>\n')
+
+HERO_BOX_OLD = '<div style="max-width: 1100px; margin: 0 auto; padding: 56px 24px 72px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 28px">'
+HERO_BOX_NEW = '<div style="max-width: 1100px; margin: 0 auto; padding: 40px 24px 72px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 28px">'
+H1_SIZE_OLD = 'font-size: clamp(52px, 9vw, 124px); line-height: 0.95;'
+H1_SIZE_NEW = 'font-size: clamp(44px, 6vw, 84px); line-height: 0.95;'
+CAROUSEL_OPEN = '<sc-if value="{{idle}}" hint-placeholder-val="{{ true }}">\n<div style="width: 100%; margin-top: 40px;'
+AUDIT_FORM = re.compile(r'<form id="audit" class="arc-rise" sc-camel-on-submit="\{\{onSubmit\}\}" style="margin-top: 28px;(.*?)</form>\n(<p style="margin: 0; font-size: 14px; color: #8E8E93">.*?</p>\n)', re.S)
 
 
 def replace_once(text, old, new, label):
@@ -153,6 +162,20 @@ def patch_template(t):
     t = replace_once(t, '<a href="#top" style="display: flex; align-items: center; gap: 10px;',
                      '<a href="/" style="display: flex; align-items: center; gap: 10px;', 'logo')
     t = replace_once(t, '<helmet>\n', '<helmet>\n' + SMOOTH_SCROLL, 'smooth scroll')
+
+    # Hero: URL field right under the subtitle, before the 3 cards; smaller H1 so
+    # that headline, field and the top of the cards fit in a desktop viewport.
+    fm = AUDIT_FORM.search(t)
+    if not fm:
+        raise SystemExit('patch "hero form": form not found')
+    form = ('<form id="audit" class="arc-rise arc-pill-form" sc-camel-on-submit="{{onSubmit}}" style="margin-top: 4px;' + fm.group(1) + '</form>\n'
+            + fm.group(2).replace('<p style="margin: 0;', '<p style="margin: -14px 0 0;', 1))
+    t = t[:fm.start()] + t[fm.end():]
+    t = replace_once(t, CAROUSEL_OPEN, form + CAROUSEL_OPEN.replace('margin-top: 40px;', 'margin-top: 0;'), 'hero carousel')
+    t = replace_once(t, HERO_BOX_OLD, HERO_BOX_NEW, 'hero padding')
+    t = replace_once(t, H1_SIZE_OLD, H1_SIZE_NEW, 'h1 size')
+    t = replace_once(t, 'color: #A1A1A6; max-width: 680px; font-weight: 500">Gemini, ChatGPT',
+                     'color: #A1A1A6; max-width: 780px; font-weight: 500">Gemini, ChatGPT', 'subtitle width')
     return t
 
 
