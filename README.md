@@ -1,6 +1,8 @@
 # Agent-Ready Check — Landing page
 
-Static landing page (single self-contained `index.html`) deployed on Vercel.
+Static site deployed on Vercel (no build step).
 
-- No build step: Vercel serves `index.html` as-is.
-- Pushing to the production branch triggers a production deployment.
+- `index.html` — landing page, served at `/`
+- `newsletter.html` — "Add to Agent" newsletter page, served at `/newsletter` (clean URLs via `vercel.json`)
+
+Pushing to `main` triggers a production deployment.
