@@ -162,3 +162,11 @@ test('runAudit reports bot walls', async () => {
     await assert.rejects(runAudit(O), (e) => e.code === 'blocked');
   } finally { globalThis.fetch = orig; }
 });
+
+test('locale preference for sampling', async () => {
+  const { preferLocale } = await import('../lib/audit/analyze.js');
+  const mk = (pre, n) => Array.from({ length: n }, (_, i) => `https://x.com${pre}/p${i}.html`);
+  assert.match(preferLocale([...mk('/de', 20), ...mk('', 15), ...mk('/en', 20)])[0], /x\.com\/p0/);
+  assert.match(preferLocale([...mk('/de', 20), ...mk('/fr', 12)])[0], /\/fr\//);
+  assert.match(preferLocale(mk('/de', 5))[0], /\/de\//);
+});
