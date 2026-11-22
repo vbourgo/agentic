@@ -170,3 +170,13 @@ test('locale preference for sampling', async () => {
   assert.match(preferLocale([...mk('/de', 20), ...mk('/fr', 12)])[0], /\/fr\//);
   assert.match(preferLocale(mk('/de', 5))[0], /\/de\//);
 });
+
+test('product sitemap detection and locale ordering', async () => {
+  const { sortByLocale } = await import('../lib/audit/analyze.js');
+  const maps = ['https://x.com/sitemap/sitemap-de.xml', 'https://x.com/sitemap/sitemap-en-ch.xml', 'https://x.com/sitemap/sitemap-fr-ch.xml', 'https://x.com/sitemap/sitemap-fr.xml', 'https://x.com/sitemap_pages.xml'];
+  assert.deepEqual(sortByLocale(maps.slice()).slice(0, 3), ['https://x.com/sitemap/sitemap-fr.xml', 'https://x.com/sitemap/sitemap-fr-ch.xml', 'https://x.com/sitemap_pages.xml']);
+  const re = /(^|[/_.-])(products?|produits?|pdp|catalog(ue)?|articles?|items?)(?=[/_.-]|\d|$)/i;
+  assert.equal(re.test('https://x.com/sitemap/sitemap-filtered-de.xml'), false);
+  assert.equal(re.test('https://x.com/sitemap_products_1.xml?from=1'), true);
+  assert.equal(re.test('https://x.com/product-sitemap.xml'), true);
+});
