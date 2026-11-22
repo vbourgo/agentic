@@ -6,7 +6,7 @@ The export is a self-contained bundle: its markup lives in a JSON string inside
 
 - points the internal links to / and /newsletter and adds the mobile viewport;
 - swaps the simulated audit for tools/landing-logic.js (real /api/audit call);
-- shows only the global score, the verdict and the most critical issue;
+- shows only the global score, the verdict, the most critical issue and the potential score;
 - adds the e-mail form that sends the full report (/api/lead), its confirmation,
   the consent notice and the error state;
 - removes the "6 / Jan. 2026 / 0 clic" cards, adds a "Voir nos offres" button to
@@ -79,9 +79,6 @@ POTENTIAL_BLOCK = re.compile(
     r'<div style="display: flex; flex-direction: column; gap: 6px">\n'
     r'<span style="font-size: 15px; color: #A1A1A6">Score potentiel après enrichissement</span>\n'
     r'.*?</span></span>\n</div>\n', re.S)
-POTENTIAL_HIDDEN = ('<sc-if value="{{hideDetails}}" hint-placeholder-val="{{ true }}">\n'
-                    '<span style="font-size: 17px; color: #A1A1A6">Prêt à rendre votre catalogue achetable par les agents ?</span>\n'
-                    '</sc-if>\n')
 
 
 STATS_CARDS = re.compile(
@@ -127,12 +124,12 @@ def patch_template(t):
     end = t.index('</sc-for>\n</div>\n', start) + len('</sc-for>\n</div>\n')
     t = t[:start] + '<sc-if value="{{showDetails}}" hint-placeholder-val="{{ false }}">\n' + t[start:end] + '</sc-if>\n' + t[end:]
 
-    # Potential score: e-mail only.
+    # Potential score: shown on the page too, as "après amélioration".
     pm = POTENTIAL_BLOCK.search(t)
     if not pm:
         raise SystemExit('patch "potential": block not found')
-    t = (t[:pm.start()] + '<sc-if value="{{showDetails}}" hint-placeholder-val="{{ false }}">\n'
-         + pm.group(0) + '</sc-if>\n' + POTENTIAL_HIDDEN + t[pm.end():])
+    block = replace_once(pm.group(0), 'Score potentiel après enrichissement', 'Score potentiel après amélioration', 'potential label')
+    t = t[:pm.start()] + block + t[pm.end():]
 
     t = replace_once(t, '<span style="font-size: 15px; color: #A1A1A6">{{total}} produits analysés</span>',
                      '<span style="font-size: 15px; color: #A1A1A6">{{totalLabel}}</span>', 'total label')
