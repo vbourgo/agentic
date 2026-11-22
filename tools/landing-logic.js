@@ -1,10 +1,10 @@
 class Component extends DCLogic {
 constructor(props) {
 super(props);
-var unlocked = false;
-try { unlocked = window.localStorage.getItem('arc_report_unlocked') === '1'; } catch (err) {}
+var savedEmail = '';
+try { savedEmail = window.localStorage.getItem('arc_report_email') || ''; } catch (err) {}
 this.run = 0;
-this.state = { url: '', phase: 'idle', step: 0, report: null, error: '', email: '', subscribed: false, car: 0, wrapIdx: -1, issuesOpen: false, unlocked: unlocked, gateEmail: '', gateBusy: false, gateError: '' };
+this.state = { url: '', auditUrl: '', phase: 'idle', step: 0, report: null, error: '', email: '', subscribed: false, car: 0, wrapIdx: -1, gateEmail: savedEmail, gateBusy: false, gateError: '', sentTo: '' };
 }
 componentDidMount() {
 var self = this;
@@ -32,9 +32,9 @@ var stepsDone = false;
 var finish = function () {
 if (run !== self.run || !stepsDone) return;
 if (failure) self.setState({ phase: 'error', error: failure, report: null });
-else if (result) self.setState({ phase: 'done', report: result, issuesOpen: self.state.unlocked });
+else if (result) self.setState({ phase: 'done', report: result });
 };
-this.setState({ phase: 'scanning', step: 0, report: null, error: '', domain: domain, issuesOpen: false, gateError: '' });
+this.setState({ phase: 'scanning', step: 0, report: null, error: '', domain: domain, auditUrl: raw, gateError: '', gateBusy: false, sentTo: '' });
 if (this.urlInput && this.urlInput.blur) this.urlInput.blur();
 setTimeout(function () { var a = self.auditAnchor; if (a && a.scrollIntoView) a.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 80);
 fetch('/api/audit?url=' + encodeURIComponent(raw), { headers: { accept: 'application/json' } })
@@ -61,15 +61,18 @@ var st = this.state;
 var email = String(st.gateEmail || '').trim();
 if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(email)) { this.setState({ gateError: 'Indiquez une adresse e-mail valide.' }); return; }
 if (st.gateBusy) return;
+var run = this.run;
 this.setState({ gateBusy: true, gateError: '' });
-var r = st.report || {};
-fetch('/api/lead', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: email, domain: r.domain, score: r.score }) })
+fetch('/api/lead', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: email, url: st.auditUrl }) })
 .then(function (res) {
-if (!res.ok) return res.json().then(function (j) { throw new Error((j && j.message) || 'Envoi impossible, réessayez.'); }, function () { throw new Error('Envoi impossible, réessayez.'); });
-try { window.localStorage.setItem('arc_report_unlocked', '1'); } catch (err) {}
-self.setState({ gateBusy: false, unlocked: true, issuesOpen: true });
+return res.json().then(function (j) { return { ok: res.ok, j: j || {} }; }, function () { return { ok: false, j: {} }; });
 })
-.catch(function (err) { self.setState({ gateBusy: false, gateError: (err && err.message) || 'Envoi impossible, réessayez.' }); });
+.then(function (x) {
+if (run !== self.run) return;
+if (!x.ok || !x.j.sent) { self.setState({ gateBusy: false, gateError: x.j.message || 'L’envoi a échoué, réessayez.' }); return; }
+try { window.localStorage.setItem('arc_report_email', email); } catch (err) {}
+self.setState({ gateBusy: false, sentTo: email });
+}, function () { if (run === self.run) self.setState({ gateBusy: false, gateError: 'Connexion impossible, réessayez.' }); });
 }
 slideRefFor(i) {
 var self = this;
@@ -116,6 +119,7 @@ return { label: l + (active ? '…' : ''), done: done, active: active, pending: 
 });
 var r = st.report;
 var rest = r ? r.issues.slice(1) : [];
+var subCount = r ? r.subs.length : 0;
 var analyzedOn = '';
 if (r && r.analyzedAt) { try { analyzedOn = new Date(r.analyzedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (err) {} }
 return {
@@ -138,25 +142,32 @@ verdictColor: r ? r.color : '#FF453A',
 verdictTag: r ? r.verdict.tag : '',
 verdictTitle: r ? r.verdict.title : '',
 verdictText: r ? r.verdict.text : '',
-subs: r ? r.subs : [],
+subs: [],
+showDetails: false,
+hideDetails: true,
 issues: r ? r.issues : [],
 issuesFirst: r ? r.issues.slice(0, 1) : [],
 issuesRest: rest,
 hasMoreIssues: rest.length > 0,
-showToggle: rest.length > 0 && st.unlocked,
-locked: rest.length > 0 && !st.unlocked,
-gateTitle: 'Débloquez les ' + rest.length + ' autres points d’amélioration',
+showToggle: false,
+showGate: !!r && !st.sentTo,
+showSent: !!r && !!st.sentTo,
+sentTo: st.sentTo,
+sentText: r ? ('Le rapport complet de ' + r.domain + ' vient d’être envoyé à ' + st.sentTo + '. Pensez à vérifier vos courriers indésirables.') : '',
+changeEmail: function () { self.setState({ sentTo: '', gateError: '' }); },
+gateTitle: 'Recevez le rapport complet par e-mail',
+gateText: 'Le détail de vos ' + subCount + ' sous-scores, ' + (rest.length ? 'les ' + rest.length + ' autres points d’amélioration avec leur impact' : 'l’impact de chaque point') + ' et votre score potentiel.',
 gateEmail: st.gateEmail,
 onGateEmail: function (e) { self.setState({ gateEmail: e.target.value, gateError: '' }); },
 onGateSubmit: function (e) { if (e && e.preventDefault) e.preventDefault(); self.submitGate(); },
 gateBusy: st.gateBusy,
-gateCta: st.gateBusy ? 'Envoi…' : 'Voir le rapport complet',
+gateCta: st.gateBusy ? 'Envoi…' : 'Recevoir le rapport',
 hasGateError: !!st.gateError,
 gateError: st.gateError,
-issuesOpen: !!st.issuesOpen && st.unlocked,
-issuesSign: st.issuesOpen ? '−' : '+',
-issuesToggleLabel: st.issuesOpen ? 'Masquer les autres points' : ('Voir les ' + rest.length + ' autres points d’amélioration'),
-toggleIssues: function () { self.setState({ issuesOpen: !self.state.issuesOpen }); },
+issuesOpen: false,
+issuesSign: '+',
+issuesToggleLabel: '',
+toggleIssues: function () {},
 total: r ? r.total : 0,
 totalLabel: r ? r.totalLabel : '',
 footnote: r ? ('Analyse automatique des pages publiques' + (analyzedOn ? ' du ' + analyzedOn : '') + ' · ' + r.platformLabel + ' · Score indicatif, à confirmer par un audit complet.') : '',

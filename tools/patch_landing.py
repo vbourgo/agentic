@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
-"""Wire the exported landing page (index.html) to the real audit API.
+"""Turn the landing page exported from the design tool into the production page.
 
-The page is a self-contained bundle exported from the design tool: its markup
-lives in a JSON string inside <script type="__bundler/template">. This script
-decodes that template, swaps the simulated audit logic for tools/landing-logic.js,
-adds the e-mail gate and the error state, and writes the bundle back.
+The export is a self-contained bundle: its markup lives in a JSON string inside
+<script type="__bundler/template">. Starting from an untouched export, this script:
 
-Run it again after re-exporting the landing page from the design tool:
-    python3 tools/patch_landing.py public/index.html
+- points the internal links to / and /newsletter and adds the mobile viewport;
+- swaps the simulated audit for tools/landing-logic.js (real /api/audit call);
+- shows only the global score, the verdict and the most critical issue;
+- adds the e-mail form that sends the full report (/api/lead), its confirmation,
+  the consent notice and the error state.
+
+Usage, after re-exporting the landing page:
+    python3 tools/patch_landing.py <exported-landing.html> public/index.html
 """
 import json
 import re
@@ -16,15 +20,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OPEN = '<script type="__bundler/template">'
-
 SR_ONLY = 'position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)'
+VIEWPORT = '<meta name="viewport" content="width=device-width, initial-scale=1">'
 
 GATE = f'''
-<sc-if value="{{{{locked}}}}" hint-placeholder-val="{{{{ true }}}}">
+<sc-if value="{{{{showGate}}}}" hint-placeholder-val="{{{{ true }}}}">
 <div style="display: flex; flex-direction: column; gap: 14px; padding: 24px 0 8px; border-top: 1px solid #2C2C2E">
 <div style="display: flex; flex-direction: column; gap: 4px">
 <span style="font-size: 17px; font-weight: 600; color: #F5F5F7">{{{{gateTitle}}}}</span>
-<span style="font-size: 15px; color: #A1A1A6">Laissez votre e-mail pour afficher le rapport détaillé : chaque point, son impact sur votre score et le nombre de fiches concernées.</span>
+<span style="font-size: 15px; color: #A1A1A6">{{{{gateText}}}}</span>
 </div>
 <form sc-camel-on-submit="{{{{onGateSubmit}}}}" style="width: 100%; max-width: 560px; display: flex; flex-wrap: wrap; gap: 10px; padding: 6px; box-sizing: border-box; background: #1C1C1E; border: 1px solid #2C2C2E; border-radius: 30px">
 <label for="gate-email" style="{SR_ONLY}">Votre e-mail professionnel</label>
@@ -34,7 +38,17 @@ GATE = f'''
 <sc-if value="{{{{hasGateError}}}}" hint-placeholder-val="{{{{ false }}}}">
 <span role="alert" style="font-size: 14px; color: #FF453A">{{{{gateError}}}}</span>
 </sc-if>
-<span style="font-size: 13px; line-height: 1.5; color: #8E8E93">Gratuit · Accès immédiat au rapport complet<br>En validant, vous acceptez d’être recontacté au sujet de votre audit.</span>
+<span style="font-size: 13px; line-height: 1.5; color: #8E8E93">Gratuit · Envoi immédiat<br>En validant, vous acceptez d’être recontacté au sujet de votre audit.</span>
+</div>
+</sc-if>
+<sc-if value="{{{{showSent}}}}" hint-placeholder-val="{{{{ false }}}}">
+<div role="status" class="arc-rise" style="display: flex; align-items: flex-start; gap: 14px; margin-top: 8px; padding: 20px; border: 1px solid #2C2C2E; border-radius: 20px; background: #1C1C1E">
+<svg width="26" height="26" sc-camel-view-box="0 0 22 22" fill="none" aria-hidden="true" style="flex: 0 0 auto"><circle cx="11" cy="11" r="10" fill="#30D158"></circle><path d="M6.5 11.5l3 3 6-6.5" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<span style="font-size: 17px; font-weight: 600; color: #F5F5F7">E-mail d’audit envoyé</span>
+<span style="font-size: 15px; line-height: 1.5; color: #A1A1A6; overflow-wrap: anywhere">{{{{sentText}}}}</span>
+<button type="button" sc-camel-on-click="{{{{changeEmail}}}}" style="align-self: flex-start; padding: 0; margin-top: 2px; border: none; background: transparent; color: #D2D2D7; font-family: Inter, sans-serif; font-size: 14px; text-decoration: underline; cursor: pointer">Envoyer à une autre adresse</button>
+</div>
 </div>
 </sc-if>
 '''
@@ -54,6 +68,15 @@ ERROR_BLOCK = '''<sc-if value="{{failed}}" hint-placeholder-val="{{ false }}">
 
 '''
 
+SUBS_GRID_START = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px">\n<sc-for list="{{subs}}"'
+POTENTIAL_BLOCK = re.compile(
+    r'<div style="display: flex; flex-direction: column; gap: 6px">\n'
+    r'<span style="font-size: 15px; color: #A1A1A6">Score potentiel après enrichissement</span>\n'
+    r'.*?</span></span>\n</div>\n', re.S)
+POTENTIAL_HIDDEN = ('<sc-if value="{{hideDetails}}" hint-placeholder-val="{{ true }}">\n'
+                    '<span style="font-size: 17px; color: #A1A1A6">Prêt à rendre votre catalogue achetable par les agents ?</span>\n'
+                    '</sc-if>\n')
+
 
 def replace_once(text, old, new, label):
     count = text.count(old)
@@ -64,17 +87,31 @@ def replace_once(text, old, new, label):
 
 def patch_template(t):
     if 'onGateSubmit' in t:
-        raise SystemExit('template already patched')
+        raise SystemExit('template already patched: start from an untouched export')
     logic = (ROOT / 'tools' / 'landing-logic.js').read_text()
     m = re.search(r'(<script type="text/x-dc" data-dc-script=""[^>]*>\n)(.*?)(</script>)', t, re.S)
     if not m or 'class Component extends DCLogic' not in m.group(2):
         raise SystemExit('patch "logic": component script not found')
     t = t[:m.start(2)] + logic + t[m.end(2):]
 
+    # Sub-scores: e-mail only.
+    start = t.find(SUBS_GRID_START)
+    if start < 0 or t.count(SUBS_GRID_START) != 1:
+        raise SystemExit('patch "subs": grid not found')
+    end = t.index('</sc-for>\n</div>\n', start) + len('</sc-for>\n</div>\n')
+    t = t[:start] + '<sc-if value="{{showDetails}}" hint-placeholder-val="{{ false }}">\n' + t[start:end] + '</sc-if>\n' + t[end:]
+
+    # Potential score: e-mail only.
+    pm = POTENTIAL_BLOCK.search(t)
+    if not pm:
+        raise SystemExit('patch "potential": block not found')
+    t = (t[:pm.start()] + '<sc-if value="{{showDetails}}" hint-placeholder-val="{{ false }}">\n'
+         + pm.group(0) + '</sc-if>\n' + POTENTIAL_HIDDEN + t[pm.end():])
+
     t = replace_once(t, '<span style="font-size: 15px; color: #A1A1A6">{{total}} produits analysés</span>',
                      '<span style="font-size: 15px; color: #A1A1A6">{{totalLabel}}</span>', 'total label')
     t = replace_once(t, '<sc-if value="{{hasMoreIssues}}" hint-placeholder-val="{{ true }}">',
-                     '<sc-if value="{{showToggle}}" hint-placeholder-val="{{ true }}">', 'toggle')
+                     '<sc-if value="{{showToggle}}" hint-placeholder-val="{{ false }}">', 'toggle')
     t = replace_once(t, '</sc-if>\n<sc-if value="{{issuesOpen}}" hint-placeholder-val="{{ false }}">',
                      '</sc-if>' + GATE + '<sc-if value="{{issuesOpen}}" hint-placeholder-val="{{ false }}">', 'gate')
     t = replace_once(t, 'Aperçu de démonstration : résultats simulés.', '{{footnote}}', 'footnote')
@@ -86,21 +123,29 @@ def patch_template(t):
     return t
 
 
-def main(path):
-    p = Path(path)
-    html = p.read_text()
+def prepare_bundle(html):
+    """Links and viewport, on the outer bundle (idempotent)."""
+    html = html.replace('Newsletter.dc.html', '/newsletter').replace('Main.dc.html', '/')
+    if 'name="viewport"' not in html[:3000]:
+        html = html.replace('<meta charset="utf-8">', '<meta charset="utf-8">\n  ' + VIEWPORT, 1)
+    return html
+
+
+def main(src, dst):
+    html = prepare_bundle(Path(src).read_text())
     start = html.index(OPEN) + len(OPEN)
     end = html.index('</script>', start)
     raw = html[start:end]
-    template = json.loads(raw)
-    patched = patch_template(template)
+    patched = patch_template(json.loads(raw))
     encoded = json.dumps(patched, ensure_ascii=False).replace('</', '<\\u002F')
     assert json.loads(encoded) == patched
     lead = raw[: len(raw) - len(raw.lstrip())]
     trail = raw[len(raw.rstrip()):]
-    p.write_text(html[:start] + lead + encoded + trail + html[end:])
-    print(f'patched {p}')
+    Path(dst).write_text(html[:start] + lead + encoded + trail + html[end:])
+    print(f'wrote {dst}')
 
 
 if __name__ == '__main__':
-    main(sys.argv[1] if len(sys.argv) > 1 else ROOT / 'public' / 'index.html')
+    if len(sys.argv) != 3:
+        raise SystemExit(__doc__)
+    main(sys.argv[1], sys.argv[2])
