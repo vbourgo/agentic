@@ -176,8 +176,8 @@ def patch_template(t):
         ('min-height: 56px; padding: 0 30px; font-size: 17px;', 'min-height: 48px; padding: 0 24px; font-size: 16px;', 'form button'),
     ):
         inner = replace_once(inner, a, b, label)
-    form = ('<form id="audit" class="arc-rise arc-pill-form" sc-camel-on-submit="{{onSubmit}}" style="margin-top: 4px;' + inner + '</form>\n'
-            + fm.group(2).replace('<p style="margin: 0;', '<p style="margin: -14px 0 0;', 1))
+    # The note under the field ("Gratuit · Sans inscription · …") is dropped.
+    form = '<form id="audit" class="arc-rise arc-pill-form" sc-camel-on-submit="{{onSubmit}}" style="margin-top: 4px;' + inner + '</form>\n'
     t = t[:fm.start()] + t[fm.end():]
     t = replace_once(t, CAROUSEL_OPEN, form + CAROUSEL_OPEN.replace('margin-top: 40px;', 'margin-top: 0;'), 'hero carousel')
     t = replace_once(t, HERO_BOX_OLD, HERO_BOX_NEW, 'hero padding')
