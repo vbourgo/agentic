@@ -168,12 +168,22 @@ def patch_template(t):
     fm = AUDIT_FORM.search(t)
     if not fm:
         raise SystemExit('patch "hero form": form not found')
-    form = ('<form id="audit" class="arc-rise arc-pill-form" sc-camel-on-submit="{{onSubmit}}" style="margin-top: 4px;' + fm.group(1) + '</form>\n'
+    inner = fm.group(1)
+    # Field sized to the hero: narrower and shorter than the export (680px wide, 72px tall).
+    for a, b, label in (
+        ('max-width: 680px; display: flex; flex-wrap: wrap; gap: 10px; padding: 8px;', 'max-width: 560px; display: flex; flex-wrap: wrap; gap: 8px; padding: 6px;', 'form box'),
+        ('min-height: 56px; box-sizing: border-box; padding: 0 24px; font-size: 18px;', 'min-height: 48px; box-sizing: border-box; padding: 0 20px; font-size: 16px;', 'form input'),
+        ('min-height: 56px; padding: 0 30px; font-size: 17px;', 'min-height: 48px; padding: 0 24px; font-size: 16px;', 'form button'),
+    ):
+        inner = replace_once(inner, a, b, label)
+    form = ('<form id="audit" class="arc-rise arc-pill-form" sc-camel-on-submit="{{onSubmit}}" style="margin-top: 4px;' + inner + '</form>\n'
             + fm.group(2).replace('<p style="margin: 0;', '<p style="margin: -14px 0 0;', 1))
     t = t[:fm.start()] + t[fm.end():]
     t = replace_once(t, CAROUSEL_OPEN, form + CAROUSEL_OPEN.replace('margin-top: 40px;', 'margin-top: 0;'), 'hero carousel')
     t = replace_once(t, HERO_BOX_OLD, HERO_BOX_NEW, 'hero padding')
     t = replace_once(t, H1_SIZE_OLD, H1_SIZE_NEW, 'h1 size')
+    t = replace_once(t, 'Gemini, ChatGPT et Claude achètent déjà pour vos clients. Découvrez en quelques secondes si votre catalogue est prêt.',
+                     'Gemini, ChatGPT et Claude achètent déjà pour vos clients.<br>Soyez prêt pour le commerce agentique.', 'subtitle text')
     t = replace_once(t, 'color: #A1A1A6; max-width: 680px; font-weight: 500">Gemini, ChatGPT',
                      'color: #A1A1A6; max-width: 780px; font-weight: 500">Gemini, ChatGPT', 'subtitle width')
     return t

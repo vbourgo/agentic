@@ -11,7 +11,7 @@ Landing page + real "Agent-Ready" audit of any e-commerce site, deployed on Verc
 - `lib/audit/` — audit engine (fetching with SSRF guard, parsing, scoring)
 - `test/` — unit + mocked end-to-end tests: `npm test`
 
-Pushing to `main` deploys to production.
+Pushing to `main` deploys to production at https://addtoagent.vercel.app (the old `agent-ready-check-ecru.vercel.app` redirects there, see `vercel.json`).
 
 ## How the score works
 

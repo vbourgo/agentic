@@ -4,7 +4,24 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "functions": {
-    "api/audit.js": { "maxDuration": 60 },
-    "api/lead.js": { "maxDuration": 60 }
-  }
+    "api/audit.js": {
+      "maxDuration": 60
+    },
+    "api/lead.js": {
+      "maxDuration": 60
+    }
+  },
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "agent-ready-check-ecru.vercel.app"
+        }
+      ],
+      "destination": "https://addtoagent.vercel.app/:path*",
+      "permanent": true
+    }
+  ]
 }
