@@ -101,6 +101,48 @@ CAROUSEL_OPEN = '<sc-if value="{{idle}}" hint-placeholder-val="{{ true }}">\n<di
 AUDIT_FORM = re.compile(r'<form id="audit" class="arc-rise" sc-camel-on-submit="\{\{onSubmit\}\}" style="margin-top: 28px;(.*?)</form>\n(<p style="margin: 0; font-size: 14px; color: #8E8E93">.*?</p>\n)', re.S)
 
 
+RECO_ITEMS = (
+    ('#FF453A', 'Structurer les attributs', '+14 pts', 'Matière, taille, couleur : les agents comparent vos produits.'),
+    ('#FF453A', 'Connecteur UCP + MCP', '+12 pts', 'Les agents cherchent et commandent chez vous.'),
+    ('#FF9F0A', 'Normaliser les variantes', '+8 pts', 'Une taille, un coloris, un SKU par déclinaison.'),
+)
+
+
+def reco_card():
+    items = ''.join(
+        '<div style="background: #FFFFFF; border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05)">'
+        '<div style="display: flex; align-items: center; gap: 8px">'
+        f'<span aria-hidden="true" style="flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: {dot}"></span>'
+        f'<span style="flex: 1 1 auto; min-width: 0; font-size: 15px; font-weight: 600; line-height: 1.3; color: #1D1D1F">{title}</span>'
+        f'<span style="flex: 0 0 auto; white-space: nowrap; font-size: 13px; font-weight: 700; color: #1F9D55; background: #E3F5EA; border-radius: 999px; padding: 3px 9px">{gain}</span>'
+        '</div>'
+        f'<span style="padding-left: 16px; font-size: 13px; line-height: 1.45; color: #6E6E73">{text}</span>'
+        '</div>'
+        for dot, title, gain, text in RECO_ITEMS)
+    return (
+        '<span style="font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #8E8E93">3 · Recommandations</span>\n'
+        '<div style="min-height: 520px; height: 100%; box-sizing: border-box; background: #F5F5F7; border-radius: 28px; padding: 28px; display: flex; flex-direction: column; gap: 18px">\n'
+        '<div style="display: flex; flex-direction: column; gap: 6px">'
+        '<span style="font-family: \'Inter Tight\', sans-serif; font-weight: 800; font-size: 26px; line-height: 1.05; letter-spacing: -0.03em; color: #1D1D1F">Vos 3 actions prioritaires</span>'
+        '<span style="font-size: 14px; line-height: 1.45; color: #6E6E73">Classées par impact sur votre score.</span>'
+        '</div>\n'
+        f'<div style="display: flex; flex-direction: column; gap: 10px">{items}</div>\n'
+        '<div style="margin-top: auto; display: flex; flex-direction: column; gap: 14px">\n'
+        '<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px">\n'
+        '<span style="font-size: 13px; color: #424245">Avec ces 3 actions</span>\n'
+        '<span style="font-family: \'Inter Tight\', sans-serif; font-weight: 800; font-size: 24px; color: #1D1D1F">40 → <span style="color: #1F9D55">74</span></span>\n'
+        '</div>\n'
+        '<button type="button" sc-camel-on-click="{{goAudit}}" style="min-height: 52px; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 16px; font-weight: 600; font-family: Inter, sans-serif; color: #FFFFFF; background: #1D1D1F; border: none; border-radius: 999px; cursor: pointer">'
+        'Auditer ma boutique<svg width="18" height="18" sc-camel-view-box="0 0 18 18" fill="none" aria-hidden="true"><path d="M9 14V4M5 8l4-4 4 4" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>\n'
+        '</div>\n'
+        '</div>\n')
+
+
+SOLUTION_CARD = re.compile(
+    r'<span style="font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #8E8E93">3 · Notre solution</span>\n'
+    r'.*?Auditer ma boutique<svg.*?</svg></button>\n</div>\n</div>\n', re.S)
+
+
 def replace_once(text, old, new, label):
     count = text.count(old)
     if count != 1:
@@ -159,6 +201,13 @@ def patch_template(t):
     t = replace_once(t, '<a href="#top" style="display: flex; align-items: center; gap: 10px;',
                      '<a href="/" style="display: flex; align-items: center; gap: 10px;', 'logo')
     t = replace_once(t, '<helmet>\n', '<helmet>\n' + SMOOTH_SCROLL, 'smooth scroll')
+
+    # Hero carousel, 3rd card: "Notre solution" becomes "Recommandations".
+    t, n = SOLUTION_CARD.subn(lambda m: reco_card(), t)
+    if n != 1:
+        raise SystemExit(f'patch "reco card": expected 1 card, found {n}')
+    t = replace_once(t, 'Faites défiler pour voir le rapport et notre solution', 'Faites défiler pour voir le rapport et nos recommandations', 'carousel note')
+    t = replace_once(t, 'aria-label="Aperçu : analyse, rapport puis notre solution"', 'aria-label="Aperçu : analyse, rapport puis recommandations"', 'carousel label')
 
     # Hero: URL field right under the subtitle, before the 3 cards; smaller H1 so
     # that headline, field and the top of the cards fit in a desktop viewport.
