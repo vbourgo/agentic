@@ -30,8 +30,13 @@ Each issue's "+N pts" is the global score recovered by fixing it.
 
 ## Leads
 
-Set `BREVO_API_KEY` (and optionally `BREVO_LIST_ID`) in the Vercel project's environment variables to send unlock e-mails to Brevo.
-Without them, leads are only written to the function logs (`lead {...}`).
+With `BREVO_API_KEY` set in the Vercel project, each unlock e-mail is upserted in Brevo:
+
+- added to the list **Agent-Ready Check — audits** (folder "Agent-Ready Check"), created on first use;
+  set `BREVO_LIST_ID` to use another list instead;
+- with the contact attributes `AUDIT_DOMAIN` (text) and `AUDIT_SCORE` (number), created on first use.
+
+Every lead is also written to the function logs (`lead {...}`), and a Brevo error never blocks the visitor.
 
 ## After re-exporting the landing page
 
