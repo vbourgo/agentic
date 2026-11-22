@@ -1,8 +1,40 @@
-# Agent-Ready Check — Landing page
+# Agent-Ready Check
 
-Static site deployed on Vercel (no build step).
+Landing page + real "Agent-Ready" audit of any e-commerce site, deployed on Vercel.
 
-- `index.html` — landing page, served at `/`
-- `newsletter.html` — "Add to Agent" newsletter page, served at `/newsletter` (clean URLs via `vercel.json`)
+## Layout
 
-Pushing to `main` triggers a production deployment.
+- `public/index.html` — landing page (bundle exported from the design tool, patched by `tools/patch_landing.py`)
+- `public/newsletter.html` — "Add to Agent" newsletter page, served at `/newsletter`
+- `api/audit.js` — `GET /api/audit?url=<shop>`: crawls the public site and returns the score report
+- `api/lead.js` — `POST /api/lead`: e-mail that unlocks the detailed report
+- `lib/audit/` — audit engine (fetching with SSRF guard, parsing, scoring)
+- `test/` — unit + mocked end-to-end tests: `npm test`
+
+Pushing to `main` deploys to production.
+
+## How the score works
+
+Four sub-scores (0–100), averaged into the global score:
+
+| Sub-score | Checks (weight) |
+|---|---|
+| Attributs produits | structured colour/material/size (35), descriptions ≥ 40 words (25), category (15), images (15), brand (10) |
+| Données structurées | schema.org Product JSON-LD (30), price + currency + availability (25), GTIN/EAN (20), structured variants (15), Organization/WebSite (10) |
+| Compatibilité UCP / ACP | UCP profile at `/.well-known/ucp` (30), MCP endpoint (25), AI agents allowed in robots.txt (20), product sitemap/feed (15), `llms.txt` (10) |
+| Checkout par un agent | product pages reachable by bots (20), public cart API (25), SKUs (15), machine-readable returns (15) and shipping (10), products in stock (10) |
+
+On Shopify the catalog is read from the public `/products.json` (up to 1,000 products), plus `/api/mcp` and `/cart.js`.
+Elsewhere, up to ~10 product pages are sampled from the product sitemap.
+Each issue's "+N pts" is the global score recovered by fixing it.
+
+## Leads
+
+Set `BREVO_API_KEY` (and optionally `BREVO_LIST_ID`) in the Vercel project's environment variables to send unlock e-mails to Brevo.
+Without them, leads are only written to the function logs (`lead {...}`).
+
+## After re-exporting the landing page
+
+```bash
+python3 tools/patch_landing.py public/index.html
+```
